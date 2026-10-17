@@ -488,13 +488,10 @@ $RECYCLE.BIN/
 # Release zips and publish output from build.ps1
 dist/
 
-# Claude Code: personal settings and notes (shared ones are committed)
-.claude/settings.local.json
+# Claude Code: local settings and skills (CLAUDE.md is committed)
+.claude/
 CLAUDE.local.md
 
 # Local test data (DESKPRESET_HOME) and exported presets
 *.deskpreset.json
 presets.json
-
-# The template's [Rr]elease/ rule (build output) would also hide the /release skill
-!.claude/skills/release/

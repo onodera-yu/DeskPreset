@@ -45,4 +45,4 @@ user's desktops — use a preset with something harmless (Notepad) and don't clo
 ## Release
 
 Version is in `Directory.Build.props`. Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the zip
-and attaches it to a GitHub Release. Use the `/release` skill.
+and attaches it to a GitHub Release. `.claude/` is not committed; a local `/release` skill may exist there.
