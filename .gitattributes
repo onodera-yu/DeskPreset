@@ -1,0 +1,6 @@
+# Normalize line endings; Windows-only project, so check out as CRLF.
+* text=auto eol=crlf
+
+*.png binary
+*.ico binary
+*.zip binary
