@@ -1,0 +1,39 @@
+name: release
+
+# Push a tag like v1.0.0 → builds the self-contained zip and attaches it to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build zip
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          if ("${{ github.ref_type }}" -ne "tag") { $version = "0.0.0-dev" }
+          ./build.ps1 -Version $version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeskPreset
+          path: dist/*.zip
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true

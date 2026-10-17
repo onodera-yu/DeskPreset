@@ -1,0 +1,333 @@
+<Window x:Class="DeskPreset.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:DeskPreset.App"
+        xmlns:core="clr-namespace:DeskPreset.Core;assembly=DeskPreset.Core"
+        Title="DeskPreset — 仮想デスクトップ プリセット"
+        Width="1360" Height="820" MinWidth="960" MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <local:AppIconConverter x:Key="AppIcon" />
+        <local:NullToVisibilityConverter x:Key="NotNullVisible" />
+        <local:NullToVisibilityConverter x:Key="NullVisible" Invert="True" />
+        <BooleanToVisibilityConverter x:Key="BoolVisible" />
+        <local:StateLabelConverter x:Key="StateLabel" />
+
+        <!-- One app inside a desktop column -->
+        <DataTemplate x:Key="AppEntryTemplate" DataType="{x:Type core:AppEntry}">
+            <Grid Margin="2,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Image Width="24" Height="24" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <Image.Source>
+                        <MultiBinding Converter="{StaticResource AppIcon}">
+                            <Binding Path="ExePath" />
+                            <Binding Path="AppUserModelId" />
+                            <Binding Path="LaunchViaAppId" />
+                        </MultiBinding>
+                    </Image.Source>
+                </Image>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Subtitle}" FontSize="11" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="{Binding State, Converter={StaticResource StateLabel}}" FontSize="10" VerticalAlignment="Center" Margin="6,0,0,0"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            </Grid>
+        </DataTemplate>
+
+        <ContextMenu x:Key="EntryMenu" x:Shared="False">
+            <MenuItem Header="このアプリだけテスト起動" Click="EntryTest_Click" />
+            <MenuItem Header="現在のウィンドウ位置を取得" Click="EntryTakePosition_Click" />
+            <Separator />
+            <MenuItem Header="複製" Click="EntryDuplicate_Click" />
+            <MenuItem Header="削除" Click="EntryDelete_Click" InputGestureText="Del" />
+        </ContextMenu>
+
+        <ContextMenu x:Key="AddAppMenu">
+            <MenuItem Header="起動中のウィンドウから…" Click="AddFromWindows_Click" />
+            <MenuItem Header="インストール済みアプリから…" Click="AddFromStartMenu_Click" />
+            <MenuItem Header="ファイルを選択…" Click="AddFromFile_Click" />
+        </ContextMenu>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="330" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ Left: preset list ============ -->
+        <Border Grid.Column="0" Padding="12" BorderThickness="0,0,1,0"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="プリセット" Style="{StaticResource SectionTitle}" />
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                    <StackPanel.Resources>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Setter Property="HorizontalAlignment" Value="Stretch" />
+                        </Style>
+                    </StackPanel.Resources>
+                    <Button Content="現在の配置から作成" HorizontalAlignment="Stretch" Click="CaptureNew_Click"
+                            Style="{DynamicResource AccentButtonStyle}"
+                            ToolTip="すべての仮想デスクトップで今開いているウィンドウを取り込みます" />
+                    <UniformGrid Columns="3" Margin="0,6,0,0">
+                        <Button Content="新規" Margin="0,0,3,0" Click="NewPreset_Click" />
+                        <Button Content="複製" Margin="3,0" Click="DuplicatePreset_Click" />
+                        <Button Content="削除" Margin="3,0,0,0" Click="DeletePreset_Click" />
+                    </UniformGrid>
+                    <UniformGrid Columns="2" Margin="0,6,0,0">
+                        <Button x:Name="ExportButton" Content="書き出し ▾" Margin="0,0,3,0" Click="Export_Click"
+                                ToolTip="他のPCへ持っていくためにファイルへ保存">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="選択中のプリセットを書き出し…" Click="ExportSelected_Click" />
+                                    <MenuItem Header="すべてのプリセットを書き出し…" Click="ExportAll_Click" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <Button Content="読み込み" Margin="3,0,0,0" Click="Import_Click"
+                                ToolTip="書き出したファイルからプリセットを追加" />
+                    </UniformGrid>
+                </StackPanel>
+                <ListBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
+                         MouseDoubleClick="PresetList_DoubleClick" ToolTip="ダブルクリックで起動">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,4">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                    <Run Text="{Binding Desktops.Count, Mode=OneWay}" /><Run Text=" デスクトップ" />
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- ============ Center: desktops of the selected preset ============ -->
+        <Grid Grid.Column="1">
+            <TextBlock Visibility="{Binding SelectedPreset, Converter={StaticResource NullVisible}}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                       Style="{StaticResource Hint}" FontSize="14"
+                       Text="左の「現在の配置から作成」で今のウィンドウ配置を取り込むか、&#x0a;「新規」で空のプリセットを作成してください。" />
+
+            <DockPanel Visibility="{Binding SelectedPreset, Converter={StaticResource NotNullVisible}}"
+                       DataContext="{Binding}">
+                <!-- toolbar -->
+                <Grid DockPanel.Dock="Top" Margin="16,12,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding SelectedPreset.Name, UpdateSourceTrigger=PropertyChanged}" FontSize="20"
+                             MaxWidth="420" HorizontalAlignment="Left" MinWidth="240" ToolTip="プリセット名" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Click="Run_Click" IsEnabled="{Binding IsIdle}" Padding="18,6"
+                                Style="{DynamicResource AccentButtonStyle}" ToolTip="このプリセットを開く (F5)">
+                            <TextBlock Text="▶  起動" FontWeight="SemiBold" />
+                        </Button>
+                        <Button Content="現在の配置で上書き" Margin="8,0,0,0" Click="Recapture_Click" />
+                        <Button x:Name="ShortcutButton" Content="ショートカット ▾" Margin="8,0,0,0" Click="Shortcut_Click">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="デスクトップにショートカットを作成" Click="ShortcutDesktop_Click" />
+                                    <MenuItem Header="サインイン時に自動で開く（スタートアップに登録）" Click="ShortcutStartup_Click" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- preset options -->
+                <WrapPanel DockPanel.Dock="Top" Margin="16,10,16,4" VerticalAlignment="Center">
+                    <TextBlock Text="起動後に表示:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding SwitchOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                              SelectedValue="{Binding SelectedPreset.SwitchToDesktop}" MinWidth="200" />
+                    <CheckBox Content="デスクトップ名を反映" Margin="20,0,0,0" VerticalAlignment="Center"
+                              IsChecked="{Binding SelectedPreset.RenameDesktops}" />
+                    <TextBlock Text="待機秒数:" VerticalAlignment="Center" Margin="20,0,6,0"
+                               ToolTip="起動したアプリのウィンドウが現れるまで待つ最大時間" />
+                    <TextBox Text="{Binding SelectedPreset.TimeoutSeconds}" Width="60" />
+                </WrapPanel>
+
+                <!-- desktop columns -->
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="8,4,8,8">
+                    <StackPanel Orientation="Horizontal">
+                        <ItemsControl ItemsSource="{Binding SelectedPreset.Desktops}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type core:DesktopLayout}">
+                                    <Border Width="270" Margin="8" Padding="10" CornerRadius="8" BorderThickness="1"
+                                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                        <DockPanel>
+                                            <Grid DockPanel.Dock="Top">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <Button Grid.Column="1" Content="表示" Padding="8,2" FontSize="12"
+                                                        Click="ShowDesktop_Click" ToolTip="この仮想デスクトップに切り替える" />
+                                                <Button Grid.Column="2" Content="✕" Padding="8,2" FontSize="12" Margin="4,0,0,0"
+                                                        Click="RemoveDesktop_Click" ToolTip="このデスクトップをプリセットから削除" />
+                                            </Grid>
+                                            <Grid DockPanel.Dock="Top" Margin="0,8,0,8">
+                                                <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                                         ToolTip="仮想デスクトップの名前（空欄なら変更しない）" />
+                                                <TextBlock x:Name="NameHint" Text="名前（任意）" IsHitTestVisible="False"
+                                                           Margin="12,0" VerticalAlignment="Center" Visibility="Collapsed"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                            </Grid>
+                                            <Button DockPanel.Dock="Bottom" Content="＋ アプリを追加" HorizontalAlignment="Stretch"
+                                                    Margin="0,8,0,0" Click="AddApp_Click" />
+                                            <ListBox ItemsSource="{Binding Apps}" ItemTemplate="{StaticResource AppEntryTemplate}"
+                                                     AllowDrop="True" MinHeight="80"
+                                                     Background="Transparent" BorderThickness="0"
+                                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                     Loaded="AppList_Loaded" Unloaded="AppList_Unloaded"
+                                                     SelectionChanged="AppList_SelectionChanged"
+                                                     PreviewMouseLeftButtonDown="AppList_PreviewMouseDown"
+                                                     PreviewMouseMove="AppList_PreviewMouseMove"
+                                                     DragOver="AppList_DragOver" Drop="AppList_Drop"
+                                                     KeyDown="AppList_KeyDown">
+                                                <ListBox.ItemContainerStyle>
+                                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                                        <Setter Property="ContextMenu" Value="{StaticResource EntryMenu}" />
+                                                    </Style>
+                                                </ListBox.ItemContainerStyle>
+                                            </ListBox>
+                                        </DockPanel>
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Name}" Value="">
+                                            <Setter TargetName="NameHint" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Width="120" Margin="8" VerticalAlignment="Stretch" Click="AddDesktop_Click"
+                                ToolTip="プリセットにデスクトップを追加">
+                            <TextBlock Text="＋&#x0a;デスクトップ&#x0a;を追加" TextAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+
+        <!-- ============ Right: selected app details ============ -->
+        <Border Grid.Column="2" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+            <Grid>
+                <TextBlock Visibility="{Binding SelectedEntry, Converter={StaticResource NullVisible}}" Margin="16"
+                           Style="{StaticResource Hint}"
+                           Text="アプリを選択すると、ここで起動方法や位置を編集できます。&#x0a;&#x0a;アプリはドラッグ＆ドロップで別のデスクトップへ移動できます。" />
+                <ScrollViewer Visibility="{Binding SelectedEntry, Converter={StaticResource NotNullVisible}}"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16,12" DataContext="{Binding SelectedEntry}">
+                        <TextBlock Text="アプリの設定" Style="{StaticResource SectionTitle}" />
+
+                        <TextBlock Text="表示名" Style="{StaticResource FieldLabel}" />
+                        <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Text="実行ファイル / ファイル / URL" Style="{StaticResource FieldLabel}" />
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="参照" Margin="6,0,0,0" Click="BrowseExe_Click" />
+                            <TextBox Text="{Binding ExePath, UpdateSourceTrigger=LostFocus}" />
+                        </DockPanel>
+
+                        <TextBlock Text="引数" Style="{StaticResource FieldLabel}" />
+                        <TextBox Text="{Binding Arguments}" ToolTip="例: エクスプローラーならフォルダのパス、ブラウザーなら URL" />
+
+                        <TextBlock Text="作業フォルダ" Style="{StaticResource FieldLabel}" />
+                        <TextBox Text="{Binding WorkingDirectory}" />
+
+                        <TextBlock Text="アプリ ID（AppUserModelID）" Style="{StaticResource FieldLabel}" />
+                        <TextBox Text="{Binding AppUserModelId}" />
+                        <CheckBox Content="アプリ ID で起動する（ストアアプリ / PWA）" Margin="0,6,0,0"
+                                  IsChecked="{Binding LaunchViaAppId}" />
+
+                        <TextBlock Text="ウィンドウの見分け方" Style="{StaticResource SectionTitle}" Margin="0,20,0,0" />
+                        <TextBlock Text="プロセス名（ランチャー経由のアプリ用）" Style="{StaticResource FieldLabel}" />
+                        <TextBox Text="{Binding MatchProcessName}" ToolTip="例: Discord.exe（空欄なら実行ファイル名で判定）" />
+                        <TextBlock Text="タイトルに含む文字" Style="{StaticResource FieldLabel}" />
+                        <TextBox Text="{Binding TitleContains}" ToolTip="同じアプリの複数ウィンドウを区別したいときに指定" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0">
+                            <Run Text="取り込み時のタイトル: " /><Run Text="{Binding CapturedTitle, Mode=OneWay}" />
+                        </TextBlock>
+
+                        <TextBlock Text="動作" Style="{StaticResource SectionTitle}" Margin="0,20,0,0" />
+                        <CheckBox Content="すでに開いているウィンドウがあれば使う" IsChecked="{Binding ReuseExisting}" />
+                        <CheckBox Content="無ければ起動する" Margin="0,6,0,0" IsChecked="{Binding LaunchIfMissing}" />
+                        <CheckBox Content="位置とサイズを復元する" Margin="0,6,0,0" IsChecked="{Binding RestorePosition}" />
+
+                        <Grid Margin="0,8,0,0" IsEnabled="{Binding RestorePosition}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="X" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Row="1" Text="{Binding Left}" />
+                            <TextBlock Grid.Column="2" Text="Y" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding Top}" />
+                            <TextBlock Grid.Row="2" Text="幅" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Row="3" Text="{Binding Width}" />
+                            <TextBlock Grid.Row="2" Grid.Column="2" Text="高さ" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding Height}" />
+                            <TextBlock Grid.Row="4" Text="状態" Style="{StaticResource FieldLabel}" />
+                            <ComboBox Grid.Row="5" ItemsSource="{x:Static local:MainViewModel.StateOptions}"
+                                      DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding State}" />
+                        </Grid>
+                        <Button Content="現在のウィンドウ位置を取得" Margin="0,10,0,0" HorizontalAlignment="Stretch"
+                                Click="EntryTakePosition_Click" />
+                        <Button Content="このアプリだけテスト起動" Margin="0,6,0,0" HorizontalAlignment="Stretch"
+                                Click="EntryTest_Click" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- ============ Log ============ -->
+        <Expander x:Name="LogExpander" Grid.Row="1" Grid.ColumnSpan="3" Header="ログ" Margin="8,0,8,0">
+            <ListBox x:Name="LogList" ItemsSource="{Binding Log}" Height="140" FontFamily="Consolas, Yu Gothic UI" FontSize="12" />
+        </Expander>
+
+        <!-- ============ Status bar ============ -->
+        <Border Grid.Row="2" Grid.ColumnSpan="3" Padding="12,5" BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <Hyperlink Click="OpenDataFolder_Click">保存先フォルダを開く</Hyperlink>
+                </TextBlock>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding ApiInfo}" Margin="0,0,20,0" VerticalAlignment="Center"
+                           Style="{StaticResource Hint}" />
+                <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
+
+
+
+
