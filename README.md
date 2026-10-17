@@ -64,15 +64,10 @@ dotnet build                 # 開発用ビルド
 ./build.ps1                  # 配布用 zip（.NET 同梱の単一 exe）を dist/ に作成
 ```
 
-## リリース
+## 開発に参加する
 
-`v1.0.0` のようなタグを push すると、GitHub Actions（`.github/workflows/release.yml`）が zip をビルドして
-Release に添付します。バージョン番号はタグから取られます。
-
-```
-git tag v1.0.0
-git push origin v1.0.0
-```
+ブランチの使い方・PR・リリース手順は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
+`main` へのマージがそのままリリースになります（`Directory.Build.props` のバージョンでタグと Release を自動作成）。
 
 ## 仕組みと制限
 

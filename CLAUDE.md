@@ -42,7 +42,16 @@ user's desktops — use a preset with something harmless (Notepad) and don't clo
 - CLI and GUI exe names must differ by more than case (Windows file names are case-insensitive).
 - `SwitchToDesktop` uses `null` = "don't switch"; keep `JsonIgnoreCondition.Never` on it.
 
-## Release
+## Branches and release
 
-Version is in `Directory.Build.props`. Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the zip
-and attaches it to a GitHub Release. `.claude/` is not committed; a local `/release` skill may exist there.
+See CONTRIBUTING.md. In short:
+
+- Never commit or push to `main` or `develop` directly (rulesets block it). Branch from `develop` as
+  `feature/*`, `fix/*`, `chore/*` or `docs/*` and open a PR to `develop` (squash merge).
+- `main` holds released code only. Releases are a PR `develop` → `main` (merge commit, never squash);
+  urgent fixes are `hotfix/*` from `main`, then back-merged into `develop`.
+- Every push to `main` runs `.github/workflows/release.yml`: it reads `<Version>` from `Directory.Build.props`,
+  creates tag `v<Version>` and publishes the zip. Bump the version before the release PR; CI rejects a PR to
+  `main` whose version is already tagged.
+- `.github/rulesets/*.json` are the branch/tag protection rules (imported in GitHub settings, not applied by git).
+- `.claude/` is not committed; a local `/release` skill may exist there.

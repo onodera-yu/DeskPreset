@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Keep the actions used by ci.yml / release.yml up to date (PRs go to develop).
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
