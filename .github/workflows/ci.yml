@@ -1,0 +1,66 @@
+name: ci
+
+# Required status checks for the main / develop rulesets (.github/rulesets/).
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build and package
+        shell: pwsh
+        run: ./build.ps1 -Version 0.0.0-ci
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DeskPreset-${{ github.sha }}
+          path: dist/*.zip
+          retention-days: 7
+
+  # main only receives releases: PRs must come from develop (release) or hotfix/* (urgent fix),
+  # and must carry a version that has not been released yet.
+  branch-policy:
+    name: branch-policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check source branch
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          if [ "$BASE" = "main" ] && [ "$HEAD" != "develop" ] && [[ "$HEAD" != hotfix/* ]]; then
+            echo "::error::main accepts PRs only from develop or hotfix/* (got '$HEAD')"
+            exit 1
+          fi
+          if [ "$BASE" = "develop" ] && [ "$HEAD" = "main" ]; then
+            echo "Back-merge from main into develop: OK"
+          fi
+
+      - name: Check version is new
+        if: github.base_ref == 'main'
+        run: |
+          version=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version is already released. Bump <Version> in Directory.Build.props."
+            exit 1
+          fi
+          echo "Will release v$version"
